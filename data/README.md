@@ -52,7 +52,18 @@ data/
 - Two sets: parking lot (Set 1) and lawn (Set 2), fixed outdoor cameras —
   the closest match to real CCTV framing of the three core datasets.
 
-## 4. RWF-2000 — real-world CCTV violence (optional)
+## 4. UBI-Fights — real-world surveillance fights, frame-level labels
+
+- Home: https://socia-lab.di.ubi.pt/EventDetection/ (direct `UBI_FIGHTS.zip`, ~7.6 GB)
+- 1,000 real-world videos (216 fight / 784 normal), 640x360 @30fps, ~80 hours,
+  annotated 0/1 **per frame** — usable for both the binary aggressive pool and
+  temporal-localization evaluation.
+- Unzip into `data/ubi_fights/UBI_FIGHTS/`, then convert:
+  `python -m src.preprocessing.ubi_fights --root data/ubi_fights/UBI_FIGHTS --output outputs/ubi_poses --device 0`
+- Its main value here: hundreds of hours of *normal CCTV motion* as hard
+  negatives — the domain our lab-captured datasets lack entirely.
+
+## 5. RWF-2000 — real-world CCTV violence (optional)
 
 - https://github.com/mchengny/RWF2000-Video-Database-for-Violence-Detection
 - 2,000 five-second clips (violent / non-violent) sourced from real surveillance

@@ -12,6 +12,8 @@ data:
     - {name: ut_interaction, cache: outputs/ut_poses}
     - {name: bullying10k,    cache: outputs/b10k_poses}
     - {name: ntu,            cache: outputs/ntu_poses}
+    # Real-surveillance fights + normal-CCTV hard negatives (skipped if absent):
+    - {name: ubi_fights,     cache: outputs/ubi_poses}
 
 model:
   name: stgcn
