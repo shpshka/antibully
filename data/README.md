@@ -63,7 +63,34 @@ data/
 - Its main value here: hundreds of hours of *normal CCTV motion* as hard
   negatives — the domain our lab-captured datasets lack entirely.
 
-## 5. RWF-2000 — real-world CCTV violence (optional)
+## 5. Fight-Detection Surveillance (seymanurakti) — real CCTV fight clips
+
+- Repo: https://github.com/seymanurakti/fight-detection-surv-dataset (MIT; videos are in the repo)
+- 300 clips (150 `fight/` + 150 `noFight/`), ~2s each, real surveillance framing.
+- Download + convert:
+  `git clone https://github.com/seymanurakti/fight-detection-surv-dataset.git data/fight_surv`
+  `python -m src.preprocessing.labeled_folder --root data/fight_surv --output outputs/fightsurv_poses --device 0`
+
+## 6. NTU CCTV-Fights — best real-CCTV fight dataset (request access)
+
+- Home: https://rose1.ntu.edu.sg/dataset/cctvFights/ — 1,000 videos (17.7h, 2,414
+  fight instances), real CCTV + mobile, **frame-level** start/end fight annotations.
+- Same NTU ROSE signed-release process as NTU RGB+D (use your existing ROSE account):
+  register → request page → accept agreement → await approval → download (~7.2 GB).
+- Once downloaded, share the annotation format and a converter will be added
+  (frame-level labels segment exactly like UBI-Fights).
+
+## Also evaluated (not integrated)
+
+- **Roboflow classroom-fight** — image-level (no motion); our temporal model needs
+  64-frame sequences, so single frames don't fit. Would need your Roboflow API key.
+- **Musawer14 fight_detection_yolov8** — an image-based violence *detector* (bounding
+  boxes), a different paradigm from our skeleton model; could serve as an optional
+  second-opinion signal, not a training source.
+- **V-JEPA 2** (Meta) — a video world-model for robotics/prediction, not violence
+  detection; integrating it would replace the skeleton pipeline entirely.
+
+## 7. RWF-2000 — real-world CCTV violence (optional)
 
 - https://github.com/mchengny/RWF2000-Video-Database-for-Violence-Detection
 - 2,000 five-second clips (violent / non-violent) sourced from real surveillance

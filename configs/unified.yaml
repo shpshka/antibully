@@ -14,6 +14,7 @@ data:
     - {name: ntu,            cache: outputs/ntu_poses}
     # Real-surveillance fights + normal-CCTV hard negatives (skipped if absent):
     - {name: ubi_fights,     cache: outputs/ubi_poses}
+    - {name: fight_surv,     cache: outputs/fightsurv_poses}  # 300 real surveillance clips
 
 model:
   name: stgcn
