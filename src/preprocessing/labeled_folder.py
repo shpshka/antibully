@@ -93,6 +93,9 @@ def main() -> None:
     parser.add_argument("--max-persons", type=int, default=8)
     parser.add_argument("--device", default=None, help='e.g. "0" for GPU')
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument(
+        "--resume", action="store_true", help="skip clips already extracted (safe to re-run)"
+    )
     args = parser.parse_args()
 
     videos = find_labeled_videos(args.root)
@@ -108,12 +111,16 @@ def main() -> None:
     from ultralytics import YOLO
 
     model = YOLO("yolov8m-pose.pt")
+    skipped = 0
     for i, (vid, label) in enumerate(videos):
+        if args.resume and (args.output / f"{vid.stem}.npz").exists():
+            skipped += 1
+            continue
         out = convert_video(vid, label, args.output, model, args.max_persons, args.device)
         print(
             f"[{i + 1}/{len(videos)}] {vid.name} ({'fight' if label else 'normal'}) -> {out.name}"
         )
-    print(f"done -> {args.output}")
+    print(f"done ({skipped} skipped) -> {args.output}")
 
 
 if __name__ == "__main__":

@@ -107,6 +107,11 @@ def _write_segment(out_dir, video_path, keypoints, scores, start, end, aggressiv
     )
 
 
+def is_extracted(output_dir: Path, stem: str) -> bool:
+    """True if this video already has at least one output segment (for --resume)."""
+    return any(Path(output_dir).glob(f"{stem}_f*.npz"))
+
+
 def find_annotation(video_path: Path, annotation_dir: Path) -> Path | None:
     for ext in (".csv", ".txt"):
         cand = annotation_dir / f"{video_path.stem}{ext}"
@@ -130,6 +135,9 @@ def main() -> None:
     parser.add_argument(
         "--fights-first", action="store_true", help="process fight (F_*) videos before normal"
     )
+    parser.add_argument(
+        "--resume", action="store_true", help="skip videos already extracted (safe to re-run)"
+    )
     args = parser.parse_args()
 
     video_dir = args.root / args.videos
@@ -147,7 +155,11 @@ def main() -> None:
     model = YOLO("yolov8m-pose.pt")
     rng = np.random.default_rng(42)
     total = 0
+    skipped = 0
     for i, vid in enumerate(videos):
+        if args.resume and is_extracted(args.output, vid.stem):
+            skipped += 1
+            continue
         ann = find_annotation(vid, ann_dir)
         if ann is None:
             print(f"[skip] no annotation for {vid.name}")
@@ -156,7 +168,7 @@ def main() -> None:
         written = convert_video(vid, labels, args.output, model, args.max_persons, args.device, rng)
         total += written
         print(f"[{i + 1}/{len(videos)}] {vid.name}: {written} segments (total {total})")
-    print(f"done: {total} segments -> {args.output}")
+    print(f"done: {total} new segments ({skipped} videos skipped) -> {args.output}")
 
 
 if __name__ == "__main__":

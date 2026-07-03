@@ -1,10 +1,18 @@
 import numpy as np
 
 from src.preprocessing.ubi_fights import (
+    is_extracted,
     label_segments,
     load_frame_labels,
     sample_neutral_segments,
 )
+
+
+def test_is_extracted_detects_existing_segments(tmp_path):
+    assert not is_extracted(tmp_path, "F_12")
+    (tmp_path / "F_12_f000000.npz").write_bytes(b"x")
+    assert is_extracted(tmp_path, "F_12")
+    assert not is_extracted(tmp_path, "F_120")  # stem prefix must not false-match
 
 
 def test_load_frame_labels_lines_and_commas(tmp_path):
