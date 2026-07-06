@@ -126,7 +126,9 @@ def train_model(config_path="configs/baseline.yaml", device="auto"):
     print(f"Using execution device: {device}")
     print(f"Loading unified dataset from cache: {pose_cache}")
     normalize = config["data"].get("normalize", False)
-    full_dataset = UnifiedSkeletonDataset(pose_cache, num_frames, normalize)
+    full_dataset = UnifiedSkeletonDataset(
+        pose_cache, num_frames, normalize, config["data"]["max_persons"]
+    )
     if len(full_dataset) == 0:
         print(
             f"[warning] No .npz files found in {pose_cache}. "

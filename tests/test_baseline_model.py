@@ -3,11 +3,53 @@ import torch
 
 from src.datasets.unified_loader import (
     UnifiedSkeletonDataset,
+    coerce_persons,
+    features_to_tensor,
     normalize_skeleton,
     split_indices,
 )
 from src.models.graph import Graph
 from src.models.stgcn import STGCNBaseline
+
+
+def test_coerce_persons_truncates_to_most_visible():
+    kp = np.zeros((5, 8, 17, 2), dtype="float32")
+    scores = np.zeros((5, 8, 17), dtype="float32")
+    scores[:, 3] = 1.0  # person 3 fully visible
+    scores[:, 6] = 0.5  # person 6 half visible
+    # everyone else invisible
+    kp[:, 3] = 7.0
+    kp[:, 6] = 9.0
+    out_kp, out_sc = coerce_persons(kp, scores, max_persons=2)
+    assert out_kp.shape == (5, 2, 17, 2)
+    # the two most-visible people (3 then 6), kept in sorted index order
+    assert (out_kp[:, 0] == 7.0).all() and (out_kp[:, 1] == 9.0).all()
+
+
+def test_coerce_persons_pads_when_too_few():
+    kp = np.ones((4, 1, 17, 2), dtype="float32")
+    scores = np.ones((4, 1, 17), dtype="float32")
+    out_kp, out_sc = coerce_persons(kp, scores, max_persons=2)
+    assert out_kp.shape == (4, 2, 17, 2)
+    assert (out_sc[:, 1] == 0).all()  # padded slot is empty
+
+
+def test_features_to_tensor_coerces_mismatched_person_counts():
+    # an 8-person clip and a 2-person clip must produce stackable tensors
+    rng = np.random.default_rng(0)
+    big = features_to_tensor(
+        rng.random((30, 8, 17, 2)).astype("float32"),
+        rng.random((30, 8, 17)).astype("float32"),
+        64,
+        max_persons=2,
+    )
+    small = features_to_tensor(
+        rng.random((30, 2, 17, 2)).astype("float32"),
+        rng.random((30, 2, 17)).astype("float32"),
+        64,
+        max_persons=2,
+    )
+    assert big.shape == small.shape == (3, 64, 17, 2)
 
 
 def test_normalize_skeleton_is_resolution_invariant():

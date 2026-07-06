@@ -36,14 +36,37 @@ def normalize_skeleton(kp, scores):
     return np.where(mask[..., None], normed, 0.0).astype(np.float32)
 
 
-def features_to_tensor(kp, scores, target_frames, normalize=False):
+def coerce_persons(kp, scores, max_persons):
+    """Force the person axis (M) to exactly ``max_persons``.
+
+    Different caches were pose-extracted with different person counts (2 for the
+    lab datasets, up to 8 for the crowd-capable surveillance ones), but the model
+    is a fixed two-person graph. When there are too many people the most-visible
+    ``max_persons`` (by total joint confidence) are kept; too few are zero-padded.
+    """
+    m = kp.shape[1]
+    if max_persons is None or m == max_persons:
+        return kp, scores
+    if m > max_persons:
+        visibility = scores.sum(axis=(0, 2))  # (M,) total confidence per person
+        keep = np.sort(np.argsort(visibility)[::-1][:max_persons])
+        return kp[:, keep], scores[:, keep]
+    pad_kp = np.zeros((kp.shape[0], max_persons, kp.shape[2], kp.shape[3]), dtype=kp.dtype)
+    pad_sc = np.zeros((scores.shape[0], max_persons, scores.shape[2]), dtype=scores.dtype)
+    pad_kp[:, :m], pad_sc[:, :m] = kp, scores
+    return pad_kp, pad_sc
+
+
+def features_to_tensor(kp, scores, target_frames, normalize=False, max_persons=None):
     """(T, M, 17, 2) keypoints + (T, M, 17) scores -> ST-GCN tensor (C=3, T, V, M).
 
     Temporally pads (edge) or truncates to ``target_frames`` and stacks the
     per-joint confidence on as a third channel. When ``normalize`` is set, the
     skeleton is centered+scaled per clip (see normalize_skeleton) so different
-    camera resolutions land in a common space — needed for cross-dataset transfer.
+    camera resolutions land in a common space. ``max_persons`` coerces the person
+    axis to a fixed size so caches with different M can be batched together.
     """
+    kp, scores = coerce_persons(kp, scores, max_persons)
     if normalize:
         kp = normalize_skeleton(kp, scores)
     T = kp.shape[0]
@@ -89,10 +112,11 @@ def label_from_filename(filename):
 class UnifiedSkeletonDataset(Dataset):
     """Loads unified .npz frame structures according to baseline.yaml parameters."""
 
-    def __init__(self, data_dir, target_frames=64, normalize=False):
+    def __init__(self, data_dir, target_frames=64, normalize=False, max_persons=None):
         self.data_dir = data_dir
         self.target_frames = target_frames
         self.normalize = normalize
+        self.max_persons = max_persons
         if os.path.exists(data_dir):
             # Sorted for a reproducible order, so split_indices gives the same
             # train/val/test partition across runs and between train & evaluate.
@@ -117,7 +141,7 @@ class UnifiedSkeletonDataset(Dataset):
             label = label_from_filename(file_path)
 
         tensor_data = features_to_tensor(
-            data["keypoints"], data["scores"], self.target_frames, self.normalize
+            data["keypoints"], data["scores"], self.target_frames, self.normalize, self.max_persons
         )
         return tensor_data, torch.tensor(label, dtype=torch.long)
 
@@ -131,9 +155,10 @@ class MultiDatasetSkeletonDataset(Dataset):
     dataset, used for cross-dataset evaluation and per-dataset ablations.
     """
 
-    def __init__(self, specs, target_frames=64, normalize=False):
+    def __init__(self, specs, target_frames=64, normalize=False, max_persons=None):
         self.target_frames = target_frames
         self.normalize = normalize
+        self.max_persons = max_persons
         self.samples = []  # (path, dataset_name, binary_label)
         for name, cache in specs:
             if not os.path.isdir(cache):
@@ -155,6 +180,10 @@ class MultiDatasetSkeletonDataset(Dataset):
         path, _, label = self.samples[idx]
         with np.load(path) as data:
             tensor_data = features_to_tensor(
-                data["keypoints"], data["scores"], self.target_frames, self.normalize
+                data["keypoints"],
+                data["scores"],
+                self.target_frames,
+                self.normalize,
+                self.max_persons,
             )
         return tensor_data, torch.tensor(label, dtype=torch.long)
