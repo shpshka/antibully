@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>School-Safe Monitor</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b1220;--card:#121c2e;--muted:#91a4bf;--green:#2dd4bf;--red:#fb7185;--line:#263550}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:#edf5ff;font:15px system-ui;padding:24px}
+    .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:16px}h1{margin:0;font-size:24px}h2{font-size:18px}
+    .grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(360px,1fr);gap:18px}.card{background:var(--card);border:1px solid #22314a;border-radius:14px;padding:15px}
+    .video-wrap{position:relative}.video{width:100%;aspect-ratio:16/9;object-fit:cover;background:#05080d;border-radius:9px}.monitor-notice{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#05080dcc;border-radius:9px;font-size:24px;font-weight:800;color:var(--red)}.monitor-notice[hidden]{display:none}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat{background:#0b1424;padding:12px;border-radius:9px}.value{font-size:22px;font-weight:700}.muted{color:var(--muted)}
+    button{border:0;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.start{background:var(--green);color:#071b1a}.stop{background:var(--red);color:#2b0710}.danger-outline{background:transparent;color:var(--red);border:1px solid var(--red);padding:6px 10px}.journal-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.evidence-btn{padding:5px 9px;margin:2px;background:#243958;color:#d9eaff}
+    table{width:100%;border-collapse:collapse;margin-top:12px}td,th{text-align:left;padding:9px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top}.HIGH,.CRITICAL{color:var(--red)}.MEDIUM{color:#fbbf24}.transcript{max-width:320px;margin-top:4px}.mini-audio{width:210px;height:32px;vertical-align:middle}
+    details{border-top:1px solid var(--line);padding:12px 0}summary{cursor:pointer;font-weight:700}input[type=number]{width:78px;background:#0b1424;color:white;border:1px solid #314460;border-radius:6px;padding:6px}input[type=file]{max-width:100%}
+    dialog{border:1px solid #425979;border-radius:14px;background:#101a2b;color:white;width:min(900px,92vw)}dialog video{width:100%;max-height:70vh;background:#000}.dialog-top{display:flex;justify-content:space-between;align-items:center}
+    a{color:var(--green)}@media(max-width:900px){body{padding:12px}.grid{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.top{align-items:flex-start;flex-direction:column}.mini-audio{width:170px}}
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div><h1>Система антибуллинга</h1><div class="muted">Каждый сигнал сохраняется для обязательной проверки человеком</div></div>
+    <div><button id="startBtn" class="start" onclick="act('start')">Запустить</button> <button id="stopBtn" class="stop" onclick="act('stop')">Остановить</button></div>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <div class="video-wrap"><img class="video" src="/video" alt="Поток камеры"><div id="monitorNotice" class="monitor-notice" hidden>Мониторинг остановлен</div></div>
+      <div class="stats">
+        <div class="stat"><div class="muted">Камера</div><div class="value" id="camera">—</div></div>
+        <div class="stat"><div class="muted">Людей</div><div class="value" id="people">0</div></div>
+        <div class="stat"><div class="muted">Вероятность драки</div><div class="value" id="violence">0%</div></div>
+      </div>
+      <p class="muted">Видео-модель: <span id="vmodel">загрузка</span> · Pose FPS: <span id="fps">0</span> · Поток: <span id="streamInfo">—</span></p>
+    </div>
+    <div class="card">
+      <h2>Звук и речь</h2>
+      <p>Микрофон: <b id="audio">—</b></p><p>Уровень: <b id="level">0</b></p>
+      <p class="muted" id="text">Речь ещё не распознана</p>
+      <details>
+        <summary>Проверить видеофайл</summary>
+        <p><input id="videoFile" type="file" accept="video/*"></p>
+        <p><label><input id="saveDemo" type="checkbox" checked> Сохранить клип в журнал, если модель увидит драку</label></p>
+        <button class="start" onclick="analyzeVideo()">Анализировать</button><p id="videoResult" class="muted"></p>
+      </details>
+      <details>
+        <summary>Настройка чувствительности</summary>
+        <p>Драка: <input id="vthr" type="number" min="0.4" max="0.95" step="0.01"></p>
+        <p>Подтверждений: <input id="vconfirm" type="number" min="1" max="5"></p>
+        <p>Толпа от: <input id="crowd" type="number" min="2" max="30"></p>
+        <button class="start" onclick="saveSettings()">Сохранить</button>
+      </details>
+      <h2>Последние события</h2><div class="journal-actions"><a href="/api/events.csv">Скачать полный журнал CSV</a><button class="danger-outline" onclick="clearJournal()">Очистить журнал</button></div><div id="events"></div>
+    </div>
+  </div>
+  <dialog id="viewer"><div class="dialog-top"><h2 id="viewerTitle">Доказательство</h2><button onclick="closeEvidence()">Закрыть</button></div><div id="viewerBody"></div></dialog>
+  <script>
+    const labels={fight:'Возможная драка',uploaded_fight:'Драка в загруженном видео',crowd:'Скопление людей',loud_voice:'Громкий голос',profanity:'Ненормативная лексика',verbal_abuse:'Угроза или оскорбление',speech_toxicity:'Токсичная речь',multimodal_risk:'КРИТИЧЕСКИЙ мультимодальный риск',audio_error:'Ошибка микрофона',camera_error:'Ошибка камеры'};
+    let lastEventSignature='';
+    let refreshing=false;
+    const byId=id=>document.getElementById(id);
+    const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    async function act(action){if(action==='stop'&&!confirm('Остановить камеру и анализ речи?'))return;await fetch('/api/'+action,{method:'POST'});await refresh()}
+    async function loadSettings(){const s=await fetch('/api/settings').then(r=>r.json());byId('vthr').value=s.violence_threshold;byId('vconfirm').value=s.violence_confirm_windows;byId('crowd').value=s.crowd_threshold}
+    async function saveSettings(){const old=await fetch('/api/settings').then(r=>r.json());await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...old,violence_threshold:+byId('vthr').value,violence_confirm_windows:+byId('vconfirm').value,crowd_threshold:+byId('crowd').value})})}
+    async function clearJournal(){
+      if(!confirm('Удалить все записи журнала? Видео, аудио и снимки останутся на диске.'))return;
+      const response=await fetch('/api/events',{method:'DELETE'});const result=await response.json();
+      if(!response.ok){alert(result.detail||'Не удалось очистить журнал');return}lastEventSignature='';await refresh();
+    }
+    async function analyzeVideo(){
+      if(!byId('videoFile').files[0])return;
+      byId('videoResult').textContent='Анализ…';const form=new FormData();form.append('file',byId('videoFile').files[0]);form.append('save_demo',byId('saveDemo').checked);
+      const r=await fetch('/api/analyze-video',{method:'POST',body:form});const x=await r.json();
+      byId('videoResult').innerHTML=r.ok?`Вероятность драки: ${Math.round(x.violence_probability*100)}% — ${x.verdict==='review'?'<b class="HIGH">ТРЕБУЕТ ПРОВЕРКИ</b>':'норма'}${x.saved_clip?' · <a href="'+esc(x.saved_clip)+'" target="_blank">открыть сохранённый клип</a>':''}`:esc(x.detail||'Ошибка');
+    }
+    function showEvidence(url,type){
+      const safe=esc(url);byId('viewerTitle').textContent=type==='video'?'Видеоклип события':type==='audio'?'Аудиозапись и речь':'Кадр события';
+      byId('viewerBody').innerHTML=type==='video'?`<video src="${safe}" controls autoplay></video>`:type==='audio'?`<audio src="${safe}" controls autoplay style="width:100%"></audio>`:`<img src="${safe}" alt="Кадр события" style="max-width:100%">`;byId('viewer').showModal();
+    }
+    function closeEvidence(){byId('viewerBody').innerHTML='';byId('viewer').close()}
+    function evidenceCell(item){
+      const parts=[];if(item.metadata?.clip)parts.push(`<button class="evidence-btn" data-url="${esc(item.metadata.clip)}" onclick="showEvidence(this.dataset.url,'video')">▶ клип</button>`);
+      if(item.metadata?.audio)parts.push(`<audio class="mini-audio" src="${esc(item.metadata.audio)}" controls preload="none"></audio>`);
+      if(item.snapshot)parts.push(`<button class="evidence-btn" data-url="${esc(item.snapshot)}" onclick="showEvidence(this.dataset.url,'image')">кадр</button>`);return parts.join(' ')||'—';
+    }
+    async function refresh(){
+      if(refreshing)return;refreshing=true;
+      try{
+        const [s,e]=await Promise.all([fetch('/api/status').then(r=>{if(!r.ok)throw new Error('status');return r.json()}),fetch('/api/events?limit=30&include_history=true').then(r=>{if(!r.ok)throw new Error('events');return r.json()})]);
+        const active=s.running||s.status==='starting';byId('camera').textContent=s.status;byId('startBtn').disabled=active;byId('stopBtn').disabled=!active;byId('monitorNotice').hidden=active;byId('people').textContent=active?s.people:'—';byId('fps').textContent=s.analysis_fps;byId('streamInfo').textContent=active?s.stream.capture_fps+' FPS · '+Math.round(s.stream.age_ms||0)+' мс':'нет потока';byId('violence').textContent=Math.round((s.violence?.smoothed_probability||0)*100)+'%';byId('vmodel').textContent=s.violence?.status||'—';byId('audio').textContent=s.audio.status+' · '+s.audio.device+' · Whisper '+s.audio.speech_model+' · токсичность: '+s.audio.toxicity_model;byId('level').textContent=s.audio.level;byId('text').textContent=s.audio.last_text||'Речь ещё не распознана';
+        const eventSignature=e.map(x=>`${x.id}:${x.metadata?.clip||''}:${x.metadata?.audio||''}`).join('|');
+        if(eventSignature!==lastEventSignature){lastEventSignature=eventSignature;byId('events').innerHTML='<table><tr><th>Дата и время</th><th>Событие / расшифровка</th><th>Увер.</th><th>Доказательство</th></tr>'+e.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td class="${x.severity.toUpperCase()}">${esc(labels[x.kind]||x.message)}${x.metadata?.text?`<div class="muted transcript">«${esc(x.metadata.text)}»</div>`:''}</td><td>${Math.round(x.confidence*100)}%</td><td>${evidenceCell(x)}</td></tr>`).join('')+'</table>'}
+      }catch(error){byId('camera').textContent='нет связи'}finally{refreshing=false}
+    }
+    loadSettings();setInterval(refresh,1500);refresh();
+  </script>
+</body>
+</html>

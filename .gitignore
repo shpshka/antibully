@@ -4,6 +4,10 @@ data/*
 outputs/
 runs/
 weights/
+runtime_data/
+monitor.stdout.log
+monitor.stderr.log
+.env.runtime
 *.pt
 *.pth
 *.onnx

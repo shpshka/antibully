@@ -1,0 +1,14 @@
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+ultralytics>=8.4,<9
+lap>=0.5.12,<1
+opencv-python>=4.10,<5
+numpy>=1.26,<3
+sounddevice>=0.5,<1
+faster-whisper>=1.2,<2
+av>=12,<20
+huggingface-hub>=0.27,<2
+transformers>=4.48,<6
+sentencepiece>=0.2,<1
+pytorchvideo>=0.1.5,<1
+python-multipart>=0.0.9

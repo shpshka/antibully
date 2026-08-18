@@ -6,6 +6,28 @@ A computer vision research project exploring whether bullying, harassment,
 and physical aggression can be detected from school surveillance cameras
 using visual signals alone — no audio, no identity recognition.
 
+## Local real-time monitor
+
+The repository also includes an optional local review dashboard with an
+RWF-2000-fine-tuned temporal X3D fight classifier, YOLO pose/tracking and crowd
+detection, offline Russian Whisper speech recognition, RuBERT toxicity analysis,
+adaptive loud-voice detection, multimodal confirmation, video/audio evidence, and
+SQLite plus JSONL event logs. A single hand movement is not an alert. These
+signals flag clips for human review; they do not identify people or autonomously
+determine that bullying occurred. See [the Russian runtime guide](docs/RUNTIME_MONITOR_RU.md).
+
+```powershell
+.\scripts\setup_monitor.ps1
+.\scripts\start_monitor.ps1
+```
+
+Open `http://127.0.0.1:8000`. Runtime settings are documented in
+`.env.runtime.example`; set them as environment variables before starting.
+The first audio-enabled launch downloads the selected Whisper model. Logs and
+snapshots are written under `runtime_data/`. Confirmed camera incidents retain a
+short MP4 clip; profanity, threats, toxic speech, and loud-voice signals retain a
+six-second WAV window. The dashboard can play both without leaving the event log.
+
 ## The Approach
 
 Rather than relying on raw video appearance, this project unifies three
